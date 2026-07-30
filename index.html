@@ -20,6 +20,7 @@
     textarea{min-height:88px;resize:vertical}.tall{min-height:180px}.report{min-height:560px;line-height:1.65}
     .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}button{border:0;border-radius:9px;padding:10px 14px;font-weight:750;cursor:pointer}
     .primary{background:#0f766e;color:white}.secondary{background:#e3ecef;color:#173342}.danger{background:#fee2e2;color:#991b1b}
+    button:disabled{cursor:not-allowed;opacity:.52}
     .notice{background:#fff7d6;border-left:4px solid #e1a600;padding:10px 12px;border-radius:7px;font-size:.84rem}
     .ok{background:#e5f7ef;border-left-color:#13885f}.treatments{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
     .treatment{border:1px solid #c4d0d4;border-radius:10px;padding:10px;display:flex;gap:8px;align-items:flex-start;font-weight:600;font-size:.84rem}
@@ -42,8 +43,8 @@
     <label>입원기록지·초진기록지 촬영 또는 파일 선택</label>
     <input id="imageInput" type="file" accept="image/*" capture="environment">
     <img id="preview" class="preview" alt="선택한 진료기록 미리보기">
-    <div class="actions"><button class="primary" id="ocrBtn">OCR 문자 추출</button><button class="secondary" id="rotateBtn">사진 90° 회전</button></div>
-    <div id="ocrStatus" class="status"></div>
+    <div class="actions"><button type="button" class="primary" id="ocrBtn" disabled>사진 선택 후 OCR 실행</button><button type="button" class="secondary" id="rotateBtn" disabled>사진 90° 회전</button></div>
+    <div id="ocrStatus" class="status" role="status" aria-live="polite">먼저 위 버튼에서 사진을 촬영하거나 선택하세요.</div>
     <label>OCR 추출 결과 <span class="hint">원본과 대조하여 오자를 수정하세요.</span></label>
     <textarea id="ocrText" class="tall" placeholder="촬영 후 OCR을 실행하거나, 진료기록 내용을 직접 붙여넣으세요."></textarea>
     <label class="approval"><input id="ocrApproved" type="checkbox"><span>원본 기록과 대조했으며, 위 추출 내용을 확인·수정했습니다.</span></label>
@@ -87,7 +88,6 @@
     <div id="appStatus" class="status no-print"></div>
   </section>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 const treatments=[
  {id:"hyperthermia",name:"고주파온열암치료",kind:"치료",desc:"고주파 에너지를 이용해 종양 부위를 가온하는 치료입니다. 적용 목적과 기대효과는 암종, 병기, 병행치료 및 장비 허가사항에 따라 담당 의사가 판단해야 합니다."},
@@ -105,7 +105,21 @@ const treatments=[
 ];
 const $=id=>document.getElementById(id);
 const fieldIds=["ocrText","patientName","birthDate","diagnosis","period","findings","history","otherTreatment","necessity","extraOpinion","report"];
-let rotation=0, imageUrl="";
+let rotation=0, imageUrl="", ocrLibraryPromise;
+
+function loadOCRLibrary(){
+ if(window.Tesseract)return Promise.resolve(window.Tesseract);
+ if(ocrLibraryPromise)return ocrLibraryPromise;
+ $("ocrStatus").textContent="OCR 모듈을 불러오는 중입니다…";
+ ocrLibraryPromise=new Promise((resolve,reject)=>{
+  const script=document.createElement("script");
+  script.src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+  script.onload=()=>window.Tesseract?resolve(window.Tesseract):reject(new Error("OCR module unavailable"));
+  script.onerror=()=>reject(new Error("OCR script load failed"));
+  document.head.appendChild(script);
+ }).catch(err=>{ocrLibraryPromise=null;throw err});
+ return ocrLibraryPromise;
+}
 
 function renderTreatments(){
  $("treatmentList").innerHTML=treatments.map(t=>`<label class="treatment"><input type="checkbox" name="treatment" value="${t.id}"><span>${t.name}<br><small class="hint">${t.kind}</small></span></label>`).join("");
@@ -135,14 +149,14 @@ function restore(d){
 function setStatus(msg,bad=false){$("appStatus").textContent=msg;$("appStatus").style.color=bad?"#b91c1c":"#0f766e"}
 async function runOCR(){
  const file=$("imageInput").files[0];if(!file){$("ocrStatus").textContent="먼저 사진을 선택하세요.";return}
- if(!window.Tesseract){$("ocrStatus").textContent="OCR 모듈을 불러오지 못했습니다. 인터넷 연결 후 다시 시도하세요.";return}
  $("ocrBtn").disabled=true;
  try{
-  const result=await Tesseract.recognize(file,"kor+eng",{logger:m=>{$("ocrStatus").textContent=m.status==="recognizing text"?`문자 인식 중 ${Math.round((m.progress||0)*100)}%`:"OCR 준비 중…"}});
+  const OCR=await loadOCRLibrary();
+  const result=await OCR.recognize(file,"kor+eng",{logger:m=>{$("ocrStatus").textContent=m.status==="recognizing text"?`문자 인식 중 ${Math.round((m.progress||0)*100)}%`:"OCR 준비 중…"}});
   $("ocrText").value=result.data.text.trim();$("ocrApproved").checked=false;$("ocrStatus").textContent="추출 완료 — 반드시 원본과 대조해 수정하세요.";save();
- }catch(e){$("ocrStatus").textContent="OCR 처리에 실패했습니다. 사진을 다시 찍거나 내용을 직접 입력하세요."}finally{$("ocrBtn").disabled=false}
+ }catch(e){$("ocrStatus").textContent="OCR 모듈을 불러오거나 처리하지 못했습니다. 인터넷 연결을 확인하고 다시 누르세요."}finally{$("ocrBtn").disabled=false}
 }
-$("imageInput").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;imageUrl=URL.createObjectURL(f);$("preview").src=imageUrl;$("preview").style.display="block";rotation=0});
+$("imageInput").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;if(imageUrl)URL.revokeObjectURL(imageUrl);imageUrl=URL.createObjectURL(f);$("preview").src=imageUrl;$("preview").style.display="block";rotation=0;$("preview").style.transform="rotate(0deg)";$("ocrBtn").disabled=false;$("rotateBtn").disabled=false;$("ocrBtn").textContent="OCR 문자 추출";$("ocrStatus").textContent=`${f.name||"촬영 사진"} 준비 완료 — OCR 문자 추출을 누르세요.`});
 $("rotateBtn").onclick=()=>{rotation=(rotation+90)%360;$("preview").style.transform=`rotate(${rotation}deg)`};
 $("ocrBtn").onclick=runOCR;$("generateBtn").onclick=buildReport;
 $("copyBtn").onclick=async()=>{if(!$("report").value.trim())return setStatus("복사할 소견서가 없습니다.",true);await navigator.clipboard.writeText($("report").value);setStatus("소견서를 복사했습니다.")};
