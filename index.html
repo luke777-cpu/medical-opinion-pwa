@@ -121,6 +121,27 @@ function loadOCRLibrary(){
  return ocrLibraryPromise;
 }
 
+function prepareImageForOCR(file){
+ return new Promise((resolve,reject)=>{
+  const img=new Image();
+  img.onload=()=>{
+   const MAX=2200, scale=Math.min(1,MAX/Math.max(img.naturalWidth,img.naturalHeight));
+   const w=Math.round(img.naturalWidth*scale), h=Math.round(img.naturalHeight*scale);
+   const rot=((rotation%360)+360)%360, swapped=rot===90||rot===270;
+   const canvas=document.createElement("canvas");
+   canvas.width=swapped?h:w; canvas.height=swapped?w:h;
+   const ctx=canvas.getContext("2d");
+   ctx.translate(canvas.width/2,canvas.height/2);
+   ctx.rotate(rot*Math.PI/180);
+   ctx.drawImage(img,-w/2,-h/2,w,h);
+   URL.revokeObjectURL(img.src);
+   resolve(canvas);
+  };
+  img.onerror=()=>reject(new Error("이미지를 읽지 못했습니다"));
+  img.src=URL.createObjectURL(file);
+ });
+}
+
 function renderTreatments(){
  $("treatmentList").innerHTML=treatments.map(t=>`<label class="treatment"><input type="checkbox" name="treatment" value="${t.id}"><span>${t.name}<br><small class="hint">${t.kind}</small></span></label>`).join("");
 }
@@ -152,21 +173,30 @@ async function runOCR(){
  $("ocrBtn").disabled=true;
  try{
   const OCR=await loadOCRLibrary();
-  const result=await OCR.recognize(file,"kor+eng",{logger:m=>{$("ocrStatus").textContent=m.status==="recognizing text"?`문자 인식 중 ${Math.round((m.progress||0)*100)}%`:"OCR 준비 중…"}});
+  $("ocrStatus").textContent="사진 준비 중…";
+  const source=await prepareImageForOCR(file);
+  const result=await OCR.recognize(source,"kor+eng",{logger:m=>{$("ocrStatus").textContent=m.status==="recognizing text"?`문자 인식 중 ${Math.round((m.progress||0)*100)}%`:"OCR 준비 중…"}});
   $("ocrText").value=result.data.text.trim();$("ocrApproved").checked=false;$("ocrStatus").textContent="추출 완료 — 반드시 원본과 대조해 수정하세요.";save();
  }catch(e){$("ocrStatus").textContent="OCR 모듈을 불러오거나 처리하지 못했습니다. 인터넷 연결을 확인하고 다시 누르세요."}finally{$("ocrBtn").disabled=false}
 }
 $("imageInput").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;if(imageUrl)URL.revokeObjectURL(imageUrl);imageUrl=URL.createObjectURL(f);$("preview").src=imageUrl;$("preview").style.display="block";rotation=0;$("preview").style.transform="rotate(0deg)";$("ocrBtn").disabled=false;$("rotateBtn").disabled=false;$("ocrBtn").textContent="OCR 문자 추출";$("ocrStatus").textContent=`${f.name||"촬영 사진"} 준비 완료 — OCR 문자 추출을 누르세요.`});
 $("rotateBtn").onclick=()=>{rotation=(rotation+90)%360;$("preview").style.transform=`rotate(${rotation}deg)`};
 $("ocrBtn").onclick=runOCR;$("generateBtn").onclick=buildReport;
-$("copyBtn").onclick=async()=>{if(!$("report").value.trim())return setStatus("복사할 소견서가 없습니다.",true);await navigator.clipboard.writeText($("report").value);setStatus("소견서를 복사했습니다.")};
+$("copyBtn").onclick=async()=>{
+ if(!$("report").value.trim())return setStatus("복사할 소견서가 없습니다.",true);
+ try{
+  if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText($("report").value)}
+  else{const ta=$("report");ta.focus();ta.select();document.execCommand("copy");ta.setSelectionRange(0,0)}
+  setStatus("소견서를 복사했습니다.");
+ }catch(e){setStatus("복사하지 못했습니다. 소견서 내용을 길게 눌러 직접 복사하세요.",true)}
+};
 $("exportBtn").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data(),null,2)],{type:"application/json"}));a.download=`의학적소견서_백업_${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)};
 $("importBtn").onclick=()=>$("importFile").click();
 $("importFile").onchange=async e=>{try{restore(JSON.parse(await e.target.files[0].text()));save();setStatus("백업을 불러왔습니다.")}catch(err){setStatus("백업 파일을 읽지 못했습니다.",true)}};
 $("clearBtn").onclick=()=>{if(!confirm("현재 환자 자료와 소견서 초안을 이 기기에서 삭제할까요?"))return;localStorage.removeItem("medicalOpinionDraftV1");location.reload()};
 document.addEventListener("input",e=>{if(e.target.matches("input,textarea"))save()});document.addEventListener("change",save);
 renderTreatments();try{const d=JSON.parse(localStorage.getItem("medicalOpinionDraftV1"));if(d)restore(d)}catch(e){}
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js");
+if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost"||location.hostname==="127.0.0.1"))navigator.serviceWorker.register("./sw.js").catch(()=>{});
 </script>
 </body>
 </html>

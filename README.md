@@ -4,13 +4,18 @@
 
 ## 실행
 
-정적 웹 서버로 `app` 폴더를 서비스합니다.
+압축을 푼 폴더에서 정적 웹 서버를 실행합니다.
 
 ```bash
-python3 -m http.server 8080 --directory app
+python3 -m http.server 8080
 ```
 
-브라우저에서 `http://localhost:8080`을 엽니다. 스마트폰 카메라 촬영과 PWA 설치는 HTTPS 배포 주소에서 사용하는 것을 권장합니다.
+브라우저에서 `http://localhost:8080`을 엽니다.
+
+스마트폰에서 쓰려면 GitHub Pages 등 HTTPS 주소에 배포하세요(카메라·PWA 설치·클립보드는 HTTPS에서 안정적으로 동작).
+GitHub Pages 예시: 저장소를 만들어 이 폴더의 파일을 루트에 올리고 Settings → Pages → Deploy from a branch(main, /root) 설정 후 `https://<계정>.github.io/<저장소>/` 접속.
+
+`index.html`을 더블클릭(file://)해도 입력·소견서 생성·백업은 동작하지만, 오프라인 캐시(PWA)는 비활성화됩니다.
 
 ## 기본 흐름
 
