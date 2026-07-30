@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#155e75">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>의학적 소견서 작성 도우미</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;color:#172033;background:#eef4f6}
+    *{box-sizing:border-box} body{margin:0} button,input,textarea,select{font:inherit}
+    header{background:linear-gradient(135deg,#0f766e,#155e75);color:white;padding:18px max(18px,calc((100% - 1120px)/2))}
+    header h1{font-size:1.35rem;margin:0 0 5px} header p{margin:0;opacity:.9;font-size:.9rem}
+    main{max-width:1120px;margin:auto;padding:18px}.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:14px}
+    .step{padding:10px 6px;border-radius:10px;background:#dbe6e9;text-align:center;font-size:.8rem}.step.active{background:#155e75;color:#fff}
+    .card{background:white;border:1px solid #d8e1e4;border-radius:14px;padding:18px;margin-bottom:14px;box-shadow:0 2px 8px #1733420a}
+    h2{font-size:1.08rem;margin:0 0 14px}h3{font-size:.95rem;margin:15px 0 8px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    label{display:block;font-weight:700;font-size:.86rem;margin:8px 0 5px}.hint{font-weight:400;color:#5c6775;font-size:.79rem}
+    input,textarea,select{width:100%;border:1px solid #b8c7cc;border-radius:9px;padding:10px;background:#fff}
+    textarea{min-height:88px;resize:vertical}.tall{min-height:180px}.report{min-height:560px;line-height:1.65}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}button{border:0;border-radius:9px;padding:10px 14px;font-weight:750;cursor:pointer}
+    .primary{background:#0f766e;color:white}.secondary{background:#e3ecef;color:#173342}.danger{background:#fee2e2;color:#991b1b}
+    .notice{background:#fff7d6;border-left:4px solid #e1a600;padding:10px 12px;border-radius:7px;font-size:.84rem}
+    .ok{background:#e5f7ef;border-left-color:#13885f}.treatments{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .treatment{border:1px solid #c4d0d4;border-radius:10px;padding:10px;display:flex;gap:8px;align-items:flex-start;font-weight:600;font-size:.84rem}
+    .treatment input{width:auto;margin-top:2px}.approval{display:flex;gap:10px;align-items:flex-start;background:#edf7f6;padding:12px;border-radius:10px}
+    .approval input{width:auto;margin-top:4px}.preview{max-width:100%;max-height:300px;border-radius:10px;margin-top:10px;display:none}
+    .status{font-size:.82rem;color:#0f766e;margin-top:8px;min-height:1.2em}.hidden{display:none}.toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center}
+    @media(max-width:760px){.grid{grid-template-columns:1fr}.treatments{grid-template-columns:1fr 1fr}.steps{grid-template-columns:1fr}.step:not(.active){display:none}main{padding:10px}.card{padding:14px}}
+    @media(max-width:440px){.treatments{grid-template-columns:1fr}}
+    @media print{header,.steps,.no-print,.notice{display:none!important}body,main{background:#fff;padding:0}.card{border:0;box-shadow:none;padding:0}.card:not(#reportCard){display:none}textarea.report{border:0;min-height:0;height:auto;overflow:visible;white-space:pre-wrap}}
+  </style>
+</head>
+<body>
+<header><h1>의학적 소견서 작성 도우미</h1><p>진료기록 확인부터 보험회사 제출용 초안 작성까지 — 최종 판단과 발급은 담당 의사가 수행합니다.</p></header>
+<main>
+  <div class="steps no-print"><div class="step active">1. 기록 촬영·OCR</div><div class="step">2. 내용 확인</div><div class="step">3. 치료 선택</div><div class="step">4. 근거 연결</div><div class="step">5. 소견서 검토</div></div>
+
+  <section class="card no-print">
+    <h2>1. 진료기록 촬영 및 문자 추출</h2>
+    <div class="notice">환자 식별정보가 포함된 사진입니다. 개인 기기에서 사용하고, 공용 기기에는 저장하지 마세요. OCR은 브라우저 안에서 처리하지만 최초 실행 시 문자 인식 모델을 내려받기 위해 인터넷이 필요할 수 있습니다.</div>
+    <label>입원기록지·초진기록지 촬영 또는 파일 선택</label>
+    <input id="imageInput" type="file" accept="image/*" capture="environment">
+    <img id="preview" class="preview" alt="선택한 진료기록 미리보기">
+    <div class="actions"><button class="primary" id="ocrBtn">OCR 문자 추출</button><button class="secondary" id="rotateBtn">사진 90° 회전</button></div>
+    <div id="ocrStatus" class="status"></div>
+    <label>OCR 추출 결과 <span class="hint">원본과 대조하여 오자를 수정하세요.</span></label>
+    <textarea id="ocrText" class="tall" placeholder="촬영 후 OCR을 실행하거나, 진료기록 내용을 직접 붙여넣으세요."></textarea>
+    <label class="approval"><input id="ocrApproved" type="checkbox"><span>원본 기록과 대조했으며, 위 추출 내용을 확인·수정했습니다.</span></label>
+  </section>
+
+  <section class="card no-print">
+    <h2>2. 환자 정보와 치료 경과</h2>
+    <div class="grid">
+      <div><label>환자명</label><input id="patientName" autocomplete="off"></div>
+      <div><label>생년월일</label><input id="birthDate" type="date"></div>
+      <div><label>진단명</label><input id="diagnosis" placeholder="예: 위암 수술 후 상태"></div>
+      <div><label>진료기간</label><input id="period" placeholder="예: 2026.07.01.~2026.07.15."></div>
+    </div>
+    <label>주요 증상·객관적 소견</label><textarea id="findings" placeholder="식욕저하, 체중감소, 통증, 검사 수치 등 실제 기록만 입력"></textarea>
+    <label>수술·항암·방사선 및 입원 경과</label><textarea id="history"></textarea>
+  </section>
+
+  <section class="card no-print">
+    <h2>3. 실제 시행 치료·약품 선택</h2>
+    <div id="treatmentList" class="treatments"></div>
+    <label>기타 치료·약품</label><textarea id="otherTreatment" placeholder="약품명, 용량, 횟수, 시행일을 실제 투약기록에 맞게 입력"></textarea>
+  </section>
+
+  <section class="card no-print">
+    <h2>4. 환자별 의학적 필요성 근거</h2>
+    <div class="notice">치료명만으로 필요성을 자동 확정하지 않습니다. 증상·검사·섭취량·치료 부작용 등 환자 기록의 근거를 직접 연결하세요.</div>
+    <label>치료와 연결되는 환자별 근거</label><textarea id="necessity" class="tall" placeholder="예: 항암치료 후 식사량이 절반 이하로 감소했고 1개월간 4 kg 체중 감소가 확인되어 영양지원이 필요했음."></textarea>
+    <label>추가 소견</label><textarea id="extraOpinion"></textarea>
+  </section>
+
+  <section id="reportCard" class="card">
+    <div class="toolbar no-print"><h2>5. 소견서 초안</h2><span class="hint">생성 후 문장별로 다시 검토하세요.</span></div>
+    <div class="actions no-print">
+      <button class="primary" id="generateBtn">소견서 생성</button><button class="secondary" id="copyBtn">복사</button>
+      <button class="secondary" onclick="window.print()">인쇄/PDF</button><button class="secondary" id="exportBtn">백업 내보내기</button>
+      <button class="secondary" id="importBtn">백업 불러오기</button><button class="danger" id="clearBtn">환자 자료 초기화</button>
+      <input id="importFile" class="hidden" type="file" accept="application/json">
+    </div>
+    <textarea id="report" class="report" placeholder="필수 내용을 입력한 뒤 ‘소견서 생성’을 누르세요."></textarea>
+    <label class="approval no-print"><input id="finalApproved" type="checkbox"><span>의무기록·실제 시행 내역·허가사항과 대조하여 최종 검토했습니다.</span></label>
+    <div id="appStatus" class="status no-print"></div>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+const treatments=[
+ {id:"hyperthermia",name:"고주파온열암치료",kind:"치료",desc:"고주파 에너지를 이용해 종양 부위를 가온하는 치료입니다. 적용 목적과 기대효과는 암종, 병기, 병행치료 및 장비 허가사항에 따라 담당 의사가 판단해야 합니다."},
+ {id:"pain",name:"비침습적 무통증 신호요법",kind:"치료",desc:"비침습적 전기 신호를 이용하는 통증 조절 치료로, 암성 통증이나 만성 통증의 완화를 목적으로 시행될 수 있습니다."},
+ {id:"zadaxin",name:"자닥신/휴닥신",kind:"약품",desc:"Thymalfasin 계열의 면역조절 제제입니다. 적응증과 투여 필요성은 환자의 면역상태, 감염 위험, 병행치료 및 국내 허가사항을 함께 고려해야 합니다."},
+ {id:"mistletoe",name:"압노바/미슬토 제제",kind:"약품",desc:"미슬토 추출물 제제로, 통합암치료에서 증상 및 삶의 질 개선을 목적으로 사용되기도 합니다. 암 치료 효과를 단정하지 않고 허가사항과 근거 수준을 확인해야 합니다."},
+ {id:"amino",name:"아미노산 수액",kind:"약품",desc:"경구섭취 저하나 영양불량이 확인된 환자에게 아미노산과 열량을 보충하기 위한 정맥 영양지원입니다."},
+ {id:"multinutrition",name:"복합 영양수액",kind:"약품",desc:"경구섭취만으로 필요한 영양을 충족하기 어려운 경우 비타민, 전해질, 미량원소 또는 열량을 보충하기 위해 사용될 수 있습니다."},
+ {id:"selenium",name:"셀레늄 제제",kind:"약품",desc:"셀레늄 결핍의 보충 또는 허가된 적응증에 따라 투여하는 미량원소 제제입니다. 검사 결과와 투여 경로·용량을 확인해야 합니다."},
+ {id:"glutathione",name:"글루타치온 제제",kind:"약품",desc:"허가된 적응증에 따라 사용하는 약제로, 투여 목적과 효과는 실제 처방 및 허가사항에 맞추어 기술해야 합니다."},
+ {id:"vitc",name:"비타민 C 주사",kind:"약품",desc:"비타민 C 보충을 위한 주사제입니다. 고용량 정맥투여는 환자 상태, 신장기능, G6PD 결핍 위험과 근거 수준을 검토하여야 합니다."},
+ {id:"vitd",name:"비타민 D 제제",kind:"약품",desc:"혈중 비타민 D 저하가 확인된 경우 결핍 교정을 위해 사용될 수 있으며, 검사 수치와 투여량을 기록해야 합니다."},
+ {id:"megace",name:"메게스트롤 현탁액",kind:"약품",desc:"암 또는 만성질환과 관련된 식욕부진·체중감소 개선을 위해 사용되는 약제로, 혈전색전증 등 위험을 함께 평가해야 합니다."},
+ {id:"rehab",name:"재활·운동치료",kind:"치료",desc:"근력저하, 보행장애, 일상생활 기능 저하를 평가하고 기능 유지·회복을 지원하기 위한 치료입니다."}
+];
+const $=id=>document.getElementById(id);
+const fieldIds=["ocrText","patientName","birthDate","diagnosis","period","findings","history","otherTreatment","necessity","extraOpinion","report"];
+let rotation=0, imageUrl="";
+
+function renderTreatments(){
+ $("treatmentList").innerHTML=treatments.map(t=>`<label class="treatment"><input type="checkbox" name="treatment" value="${t.id}"><span>${t.name}<br><small class="hint">${t.kind}</small></span></label>`).join("");
+}
+function selectedTreatments(){return [...document.querySelectorAll('[name=treatment]:checked')].map(x=>treatments.find(t=>t.id===x.value));}
+function clean(v){return (v||"").trim().replace(/\n{3,}/g,"\n\n")}
+function buildReport(){
+ if(!$("ocrApproved").checked){setStatus("먼저 OCR/입력 내용을 원본과 대조하고 확인란에 체크하세요.",true);return}
+ if(!clean($("diagnosis").value)||!clean($("history").value)){setStatus("진단명과 치료 경과를 입력하세요.",true);return}
+ const sel=selectedTreatments(), nm=clean($("patientName").value)||"상기 환자";
+ const info=[`환자명: ${nm}`, $("birthDate").value&&`생년월일: ${$("birthDate").value}`,`진단명: ${clean($("diagnosis").value)}`,$("period").value&&`진료기간: ${clean($("period").value)}`].filter(Boolean).join("\n");
+ const findings=clean($("findings").value), hist=clean($("history").value);
+ const treatmentText=sel.length?sel.map((t,i)=>`${i+1}) ${t.name}\n${t.desc}`).join("\n\n"):"선택된 치료 없음";
+ const other=clean($("otherTreatment").value);
+ const evidence=clean($("necessity").value);
+ const extra=clean($("extraOpinion").value);
+ $("report").value=`의학적 소견서(초안)\n\n[환자 정보]\n${info}\n\n[1. 병력 및 치료 경과]\n${nm}는 ${clean($("diagnosis").value)}로 진료받았습니다. ${hist}${findings?`\n\n진료기록에서 확인된 주요 증상 및 객관적 소견은 다음과 같습니다.\n${findings}`:""}\n\n[2. 시행한 치료·약품의 설명과 일반적 목적]\n${treatmentText}${other?`\n\n기타 실제 시행 내역:\n${other}`:""}\n\n[3. 환자 기록에 근거한 의학적 필요성]\n${evidence||"※ 환자별 증상·검사·섭취량·치료 경과에 근거한 필요성을 담당 의사가 입력해야 합니다."}${extra?`\n\n${extra}`:""}\n\n위 내용은 현재 확인 가능한 의무기록과 실제 시행 내역을 토대로 작성한 초안이며, 최종 발급 전 담당 의사가 원기록, 약제 허가사항 및 환자 상태와의 일치 여부를 확인합니다.`;
+ save(); setStatus("소견서 초안을 생성했습니다. 문장별 근거를 최종 확인하세요.");
+}
+function data(){return {version:1,savedAt:new Date().toISOString(),fields:Object.fromEntries(fieldIds.map(id=>[id,$(id).value])),ocrApproved:$("ocrApproved").checked,finalApproved:$("finalApproved").checked,treatments:selectedTreatments().map(t=>t.id)}}
+function save(){localStorage.setItem("medicalOpinionDraftV1",JSON.stringify(data()))}
+function restore(d){
+ if(!d||d.version!==1)throw new Error("지원하지 않는 백업 형식");
+ fieldIds.forEach(id=>$(id).value=d.fields?.[id]||"");$("ocrApproved").checked=!!d.ocrApproved;$("finalApproved").checked=!!d.finalApproved;
+ document.querySelectorAll('[name=treatment]').forEach(x=>x.checked=(d.treatments||[]).includes(x.value));
+}
+function setStatus(msg,bad=false){$("appStatus").textContent=msg;$("appStatus").style.color=bad?"#b91c1c":"#0f766e"}
+async function runOCR(){
+ const file=$("imageInput").files[0];if(!file){$("ocrStatus").textContent="먼저 사진을 선택하세요.";return}
+ if(!window.Tesseract){$("ocrStatus").textContent="OCR 모듈을 불러오지 못했습니다. 인터넷 연결 후 다시 시도하세요.";return}
+ $("ocrBtn").disabled=true;
+ try{
+  const result=await Tesseract.recognize(file,"kor+eng",{logger:m=>{$("ocrStatus").textContent=m.status==="recognizing text"?`문자 인식 중 ${Math.round((m.progress||0)*100)}%`:"OCR 준비 중…"}});
+  $("ocrText").value=result.data.text.trim();$("ocrApproved").checked=false;$("ocrStatus").textContent="추출 완료 — 반드시 원본과 대조해 수정하세요.";save();
+ }catch(e){$("ocrStatus").textContent="OCR 처리에 실패했습니다. 사진을 다시 찍거나 내용을 직접 입력하세요."}finally{$("ocrBtn").disabled=false}
+}
+$("imageInput").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;imageUrl=URL.createObjectURL(f);$("preview").src=imageUrl;$("preview").style.display="block";rotation=0});
+$("rotateBtn").onclick=()=>{rotation=(rotation+90)%360;$("preview").style.transform=`rotate(${rotation}deg)`};
+$("ocrBtn").onclick=runOCR;$("generateBtn").onclick=buildReport;
+$("copyBtn").onclick=async()=>{if(!$("report").value.trim())return setStatus("복사할 소견서가 없습니다.",true);await navigator.clipboard.writeText($("report").value);setStatus("소견서를 복사했습니다.")};
+$("exportBtn").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data(),null,2)],{type:"application/json"}));a.download=`의학적소견서_백업_${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)};
+$("importBtn").onclick=()=>$("importFile").click();
+$("importFile").onchange=async e=>{try{restore(JSON.parse(await e.target.files[0].text()));save();setStatus("백업을 불러왔습니다.")}catch(err){setStatus("백업 파일을 읽지 못했습니다.",true)}};
+$("clearBtn").onclick=()=>{if(!confirm("현재 환자 자료와 소견서 초안을 이 기기에서 삭제할까요?"))return;localStorage.removeItem("medicalOpinionDraftV1");location.reload()};
+document.addEventListener("input",e=>{if(e.target.matches("input,textarea"))save()});document.addEventListener("change",save);
+renderTreatments();try{const d=JSON.parse(localStorage.getItem("medicalOpinionDraftV1"));if(d)restore(d)}catch(e){}
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js");
+</script>
+</body>
+</html>

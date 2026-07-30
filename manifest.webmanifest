@@ -1,0 +1,17 @@
+{
+  "name": "의학적 소견서 작성 도우미",
+  "short_name": "소견서 도우미",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#eef4f6",
+  "theme_color": "#155e75",
+  "description": "의사가 진료기록을 확인하고 보험회사 제출용 의학적 소견서 초안을 작성하는 로컬 중심 PWA",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
